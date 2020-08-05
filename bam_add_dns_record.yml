@@ -1,0 +1,23 @@
+---
+- hosts: all
+  gather_facts: false
+  vars:
+    - bam_action: create
+  roles:
+    - bam_dns_record
+
+
+    - name: Add DHCP Match Class
+      uri:
+        url: https://{{ bluecat_host }}/Services/REST/v1/addDHCPServiceDeploymentOption?entityId={{ dchprange_object_id }}&name=allow-dhcp-class-members&value=&properties={{ store.MatchClass }}
+        headers:
+          Authorization: "{{ api_token }}"
+        method: POST
+        validate_certs: no
+        return_content: yes
+      register: dhcprangeoutput
+      ignore_errors: yes
+
+    - name: debug dnsserver1, dnsserver2
+      debug:
+        msg: "{{ store.DNSServer1|string , store.DNSServer2|string }}"

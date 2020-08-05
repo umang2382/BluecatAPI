@@ -1,0 +1,131 @@
+---
+    - name: Login and get authorization token for Bluecat Address Manager
+      uri:
+        url: "https://{{ bluecat_host }}/Services/REST/v1/login?username={{ bluecat_username }}&password={{ bluecat_password }}"
+        method: GET
+        validate_certs: no
+        return_content: yes
+      no_log: no
+      register: api_token_output
+
+    - name: Save Bluecat Address Manager authorization token
+      set_fact:
+        api_token: "{{ api_token_output.content | regex_replace('\"Session Token-> ', '') | regex_replace(' <- for User : .*', '')}}"
+
+    - name: Get ID of Configuration entity
+      uri:
+        url: "https://{{ bluecat_host }}/Services/REST/v1/getEntityByName?parentId=0&name={{ bluecat_configuration_name | urlencode }}&type=Configuration"
+        headers:
+          Authorization: "{{ api_token }}"
+        method: GET
+        validate_certs: no
+        return_content: yes
+      register: config_output
+
+    - name: Save configuration entity ID
+      set_fact:
+        configurationId: "{{ config_output.json.id }}"
+
+    - name: Fail if configuration not found
+      fail:
+        msg: "Configuration ID not found for name <{{ bluecat_configuration_name }}>"
+      when: "configurationId == '0'"
+
+    - name: Get ID of your view
+      uri:
+        url: "https://{{ bluecat_host }}/Services/REST/v1/getEntityByName?parentId={{ configurationId }}&name={{ bluecat_dns_view }}&type=View"
+        headers:
+          Authorization: "{{ api_token }}"
+        method: GET
+        validate_certs: no
+        return_content: yes
+      register: view_output
+
+    - name: Save view ID
+      set_fact:
+        viewId: "{{ view_output.json.id }}"
+
+    - name: Fail if view not found
+      fail:
+        msg: "View ID not found for name <{{ bluecat_dns_view }}>"
+      when: "viewId == '0'"
+
+    - name: Get host record id
+      uri:
+        url: "https://{{ bluecat_host }}/Services/REST/v1/getHostRecordsByHint?containerId={{ viewId }}&start=0&count=1&options=hint=^{{ shortname }}.{{ bbb_domain }}$"
+        method: GET
+        validate_certs: no
+        headers:
+          Authorization: "{{ api_token }}"
+        return_content: yes
+      changed_when: false
+      register: host_record_output
+
+    - name: Fail if host record already exists
+      fail:
+        msg: "Host record {{ shortname }}.{{ bbb_domain }} already exists"
+      when: host_record_output.content != "[]"
+
+    - name: Add host record to Bluecat Address Manager
+      uri:
+        url: "https://{{ bluecat_host }}/Services/REST/v1/addHostRecord?viewId={{ viewId }}&absoluteName={{ shortname }}.{{bbb_domain}}&addresses={{ host_ip }}&ttl=-1"
+        method: POST
+        validate_certs: no
+        return_content: yes
+        headers:
+          Authorization: " {{ api_token }}"
+      register: addhost_output
+      changed_when: "addhost_output.json != 0"
+
+    - name: Logout of API
+      uri:
+        url: "https://{{ bluecat_host }}/Services/REST/v1/logout"
+        headers:
+          Authorization: "{{ api_token }}"
+        method: GET
+        validate_certs: no
+        return_content: yes
+      register: logout_output
+
+#    - name: Set DNS ID fact
+#      set_fact:
+#        dnsId: "{{ addhost_output.json }}"
+#
+#    - name: Get ID of linked IP address
+#      uri:
+#        url: "https://{{ bluecat_host }}/Services/REST/v1/getLinkedEntities?entityId={{ dnsId }}&type=IP4Address&start=0&count=10"
+#        headers:
+#          Authorization: "{{ api_token }}"
+#        method: GET
+#        validate_certs: no
+#        return_content: yes
+#      register: linked_ip_output
+#
+#    - name: Set Existing IP ID Fact
+#      set_fact:
+#        ipId: "{{ (linked_ip_output.json | last).id }}"
+#
+#    - name: Find parent network of IP
+#      uri:
+#        url: "https://{{ bluecat_host }}/Services/REST/v1/getParent?entityId={{ ipId }}"
+#        headers:
+#          Authorization: "{{ api_token }}"
+#        method: GET
+#        validate_certs: no
+#        return_content: yes
+#      register: network_output
+#
+#    - name: Set Network Fact
+#      set_fact:
+#        networkId: "{{ network_output.json.id }}"
+#
+#    - name: Execute Quick Deploy for the given network
+#      uri:
+#        url: "https://{{ bluecat_host }}/Services/REST/v1/quickDeploy?entityId={{ networkId }}"
+#        headers:
+#          Authorization: "{{ api_token }}"
+#        method: POST
+#        validate_certs: no
+#        return_content: yes
+#      changed_when: true
+#      register: quick_deploy_output

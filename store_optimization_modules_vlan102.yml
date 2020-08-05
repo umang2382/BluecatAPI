@@ -1,0 +1,142 @@
+
+    - name: Add Network
+      uri:
+        url: "https://{{ bluecat_host }}/Services/REST/v1/addIP4Network?blockId={{ store.ParentId }}&CIDR={{ store.Network }}&properties=name={{ store.Store | string }}"
+        headers:
+          Authorization: "{{ api_token }}"
+        method: POST
+        validate_certs: no
+        return_content: yes
+      register: addoutput
+      changed_when: "addoutput.status == 200"
+      ignore_errors: yes
+
+    - name: Save Object ID
+      set_fact:
+        object_id: "{{ addoutput.content }}"
+        
+    - name: display object id
+      debug:
+        msg: "{{ addoutput.content }}"
+      
+    - name: Add dns server
+      uri:
+        url: https://{{ bluecat_host }}/Services/REST/v1/addDHCPClientDeploymentOption?entityId={{ object_id }}&name=dns-server&value={{ store.DNSServer1 }},{{ store.DNSServer2 }}
+        headers:
+          Authorization: "{{ api_token }}"
+        method: POST
+        validate_certs: no
+        return_content: yes
+      register: dnsoutput
+      ignore_errors: yes
+      
+    - name: Add router
+      uri:
+        url: https://{{ bluecat_host }}/Services/REST/v1/addDHCPClientDeploymentOption?entityId={{ object_id }}&name=router&value={{ store.Router }}
+        headers:
+          Authorization: "{{ api_token }}"
+        method: POST
+        validate_certs: no
+        return_content: yes
+      register: routeroutput  
+      ignore_errors: yes
+      
+    - name: Add DHCP range
+      uri:
+        url: https://{{ bluecat_host }}/Services/REST/v1/addDHCP4Range?networkId={{ object_id }}&start={{ store.ScopeStart }}&end={{ store.ScopeStop }}
+        headers:
+          Authorization: "{{ api_token }}"
+        method: POST
+        validate_certs: no
+        return_content: yes
+      register: dhcprangeoutput
+      ignore_errors: yes
+      
+    - name: Save Object ID
+      set_fact:
+        dchprange_object_id: "{{ dhcprangeoutput.content }}"
+
+    - name: display object id
+      debug:
+        msg: "{{ dhcprangeoutput.content }}"
+
+    - name: Add DHCP Match Class
+      uri:
+        url: https://{{ bluecat_host }}/Services/REST/v1/addDHCPServiceDeploymentOption?entityId={{ dchprange_object_id }}&name=allow-dhcp-class-members&value=&properties=dhcpMatchClass={{ store.MatchClass }}|inherited=false
+        headers:
+          Authorization: "{{ api_token }}"
+        method: POST
+        validate_certs: no
+        return_content: yes
+      register: dhcprangeoutput
+      ignore_errors: yes
+
+    - name: Add DHCP range2
+      uri:
+        url: https://{{ bluecat_host }}/Services/REST/v1/addDHCP4Range?networkId={{ object_id }}&start={{ store.ScopeStart2 }}&end={{ store.ScopeStop2 }}
+        headers:
+          Authorization: "{{ api_token }}"
+        method: POST
+        validate_certs: no
+        return_content: yes
+      register: dhcprange2output
+      ignore_errors: yes
+      
+    - name: Save Object ID
+      set_fact:
+        dchprange2_object_id: "{{ dhcprange2output.content }}"
+
+    - name: display object id
+      debug:
+        msg: "{{ dhcprange2output.content }}"
+
+    - name: Add DHCP Match Class2
+      uri:
+        url: https://{{ bluecat_host }}/Services/REST/v1/addDHCPServiceDeploymentOption?entityId={{ dchprange2_object_id }}&name=allow-dhcp-class-members&value=&properties=dhcpMatchClass={{ store.MatchClass2 }}|inherited=false
+        headers:
+          Authorization: "{{ api_token }}"
+        method: POST
+        validate_certs: no
+        return_content: yes
+      register: dhcprangeoutput
+      ignore_errors: yes
+
+    - name: Add DHCP Match Class3
+      uri:
+        url: https://{{ bluecat_host }}/Services/REST/v1/addDHCPServiceDeploymentOption?entityId={{ dchprange2_object_id }}&name=allow-dhcp-class-members&value=&properties=dhcpMatchClass={{ store.MatchClass3 }}|inherited=false
+        headers:
+          Authorization: "{{ api_token }}"
+        method: POST
+        validate_certs: no
+        return_content: yes
+      register: dhcprangeoutput
+      ignore_errors: yes
+
+    - name: Add DHCP master and secondary
+      uri:
+        url: https://{{ bluecat_host }}/Services/REST/v1/addDHCPDeploymentRole?entityId={{ object_id }}&serverInterfaceId={{ store.dhcpserver1 }}&type=MASTER&properties=secondaryServerInterfaceId={{ store.dhcpserver2 }}        
+        headers:
+          Authorization: "{{ api_token }}"
+        method: POST
+        validate_certs: no
+        return_content: yes
+      register: dhcpmastersecoutput
+      ignore_errors: yes
+      
+    - debug:
+        var: dhcpmastersecoutput.json
+
+#    - name: Delete Network
+#      uri:
+#        url: "https://{{ bluecat_host }}/Services/REST/v1/delete?objectId={{ object_id }}"
+#        headers:
+#          Authorization: "{{ api_token }}"
+#        method: DELETE
+#        validate_certs: no
+#        return_content: yes
+#      register: deleteoutput
+#      changed_when: "deleteoutput.status == 200"
+
+    - name: debug dnsserver1, dnsserver2
+      debug:
+        msg: "{{ store.DNSServer1|string , store.DNSServer2|string }}"

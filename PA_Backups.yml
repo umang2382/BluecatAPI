@@ -1,0 +1,3 @@
+- name: Check
+  uri:
+    url: http://www.cnn.com

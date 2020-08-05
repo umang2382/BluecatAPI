@@ -1,0 +1,60 @@
+---
+- hosts: localhost
+  gather_facts: false
+
+  # vars_files:
+  #  - ./vars/vault_vars.yml
+  #  - ./vars/vars.yml
+
+  vars:
+    datafile: vlan102.txt
+    bluecat_host: <BAM_FQDN>
+
+  tasks:
+
+    - name: Check if all store numbers are unique
+      read_csv:
+        path: "{{ datafile }}"
+        unique: yes
+        key: Store
+        dialect: excel-tab
+      register: dictout
+
+    - name: Save info from file
+      read_csv:
+        path: "{{ datafile }}"
+        dialect: excel-tab
+      register: listout
+
+    - name: debug listout
+      debug:
+        msg: "{{ listout }}"
+
+    - name: Get authorization token for Bluecat Address Manager
+      uri:
+        url: https://{{ bluecat_host }}/Services/REST/v1/login?username=<username>&password=<password>
+        method: GET
+        validate_certs: no
+        return_content: yes
+      no_log: no
+      register: api_token_output
+
+    - name: Save Bluecat Address Manager authorization token
+      set_fact:
+        api_token: "{{ api_token_output.content | regex_replace('\"Session Token-> ', '') | regex_replace(' <- for User : .*', '')}}"
+
+    - include_tasks: store_optimization_modules_vlan102.yml
+      loop:
+        "{{ listout.list }}"
+      loop_control:
+        loop_var: store
+
+    - name: Logout of API
+      uri:
+        url: "https://{{ bluecat_host }}/Services/REST/v1/logout"
+        headers:
+          Authorization: "{{ api_token }}"
+        method: GET
+        validate_certs: no
+        return_content: yes
+      register: logout_output
